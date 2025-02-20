@@ -12,31 +12,6 @@ try {
 			sh 'mvn -B clean package'
 		}
 	}
-	stage('Execute in docker python container') {
-		node {
-			dockerExecuteOnKubernetes(
-				script: this,
-				dockerImage: 'suse.int.repositories.cloud.sap/suse/sle15:latest'
-			)
-			{
-				sh """
-				zypper -n install gawk
-				zypper -n install curl
-				zypper -n install unzip
-				zypper -n install python3
-				zypper -n install python3-pip
-				zypper -n install openssh
-				zypper -n install systemd
-				zypper -n install clamav
-				zypper -n install netcat-openbsd
-				zypper -n install dos2unix
-				ls -l
-				zypper -n install bind-utils
-				systemctl enable sshd
-				whereis ssh
-			}
-		}
-	}
 } catch (Throwable err) { // catch all exceptions
 	globalPipelineEnvironment.addError(this, err)
 	throw err
