@@ -1,15 +1,45 @@
 #!/usr/bin/env groovy
 
-//@Library(['piper-lib', 'piper-lib-os']) _
+@Library(['piper-lib', 'piper-lib-os']) _
 
 try {
-	stage('Download from git and build with maven') {
+	stage('Execute in docker python container') {
 		node {
-			sh '''  echo deploy step: $step '''
-			deleteDir()
-			//download released version from nexus and unpack
-			checkout scm
-			sh 'mvn -B clean package'
+			dockerExecuteOnKubernetes(
+				script: this,
+				dockerImage: 'suse.int.repositories.cloud.sap/suse/sle15:latest'
+			)
+			{
+				sh """
+				zypper -n install gawk
+				zypper -n install curl
+				zypper -n install unzip
+				zypper -n install python3
+				zypper -n install python3-pip
+				zypper -n install openssh
+				zypper -n install systemd
+				zypper -n install clamav
+				zypper -n install netcat-openbsd
+				zypper -n install dos2unix
+				ls -l
+				zypper -n install bind-utils
+				systemctl enable sshd
+				"""
+                utils = load '/home/jenkins/agent/workspace/Pipeline ApplianceToolkit - AgentPublishing (LinuxAgent)/jenkins_utils'
+                archive_names = utils.downloadArchives("${params.nexusURL}")
+                utils.pre_scan(archive_names)
+				sh """#!/bin/bash
+				pip install lxml
+				pip install certifi
+				pip install requests
+				set -e
+				"""
+				script_args = utils.prepScriptArgs("${params}")
+				sh """#!/bin/bash
+				python3 /sat/scripts/operations/publish_tool/publish_tool_snapshot.py ${script_args}
+				"""
+				utils.post_scan()
+			}
 		}
 	}
 } catch (Throwable err) { // catch all exceptions
